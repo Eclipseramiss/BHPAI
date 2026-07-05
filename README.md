@@ -42,20 +42,6 @@ This project combines a powerful **C++ PE analyzer** with a **LightGBM machine l
 
 ---
 
-## Project Structure
-/
-├── pe_analyzer.exe # Main analyzer (built from C++)
-├── main.py / train.py # Training scripts
-├── dataset/
-│ ├── malware/ # JSON reports from malware samples
-│ └── benign/ # JSON reports from clean files
-├── malware_detector_lgb.pkl # Trained model
-├── selected_features.txt # List of used features
-├── Makefile
-└── README.md
-
----
-
 ## Requirements
 
 ### For Analyzer (C++)
