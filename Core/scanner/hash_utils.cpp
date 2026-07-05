@@ -246,18 +246,16 @@ FileHashes compute_hashes(const std::vector<uint8_t>& buffer) {
 
     // Fuzzy hash
     {
-        // FuzzyHash fh{};
-        // int pieces = compute_fuzzy_hash(buffer.data(), buffer.size(), &fh);
-        // if (pieces > 0) {
-        //     char fuzzy_buf[256]{};
-        //     fuzzyhash_to_string(&fh, fuzzy_buf, sizeof(fuzzy_buf));
-        //     res.fuzzy = fuzzy_buf;
-        // } else {
-        //     res.fuzzy = "(fuzzy hash error or file too small)";
-        // }
-        res.fuzzy = "disabled";
+        FuzzyHash fh{};
+        int pieces = compute_fuzzy_hash(buffer.data(), buffer.size(), &fh);
+        if (pieces > 0) {
+            char fuzzy_buf[256] = {0};
+            fuzzyhash_to_string(&fh, fuzzy_buf, sizeof(fuzzy_buf));
+            res.fuzzy = fuzzy_buf;
+        } else {
+            res.fuzzy = "(fuzzy hash error or file too small)";
+        }
     }
-
     return res;
 }
 
