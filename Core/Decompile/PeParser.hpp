@@ -115,6 +115,7 @@ struct SectionInfo {
 class PeParser {
 public:
     explicit PeParser(const std::string& filepath);
+    PeParser(const std::vector<uint8_t>& buffer, const std::string& filepath);
     ~PeParser() = default;
 
     bool is_valid() const { return valid_; }

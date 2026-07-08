@@ -142,8 +142,7 @@ bool is_call_to_suspicious_import(
     if (it == iat_va_to_name.end()) return false;
 
     std::string api = it->second;
-    std::transform(api.begin(), api.end(), api.begin(),
-                   [](unsigned char c){ return std::tolower(c); });
+    std::transform(api.begin(), api.end(), api.begin(), [](unsigned char c){ return std::tolower(c); });
 
     return suspicious_apis.count(api) > 0;
 }
@@ -158,37 +157,37 @@ std::vector<OpcodeFeature> extract_suspicious_opcode_ngrams(
     std::vector<OpcodeFeature> features;
     std::unordered_map<std::string, OpcodeFeature> feature_map;
 
-    std::cout << "[BẮT ĐẦU] Phân tích opcode n-gram\n";
+    std::cout << "[BEGIN] Analyzing opcode n-gram\n";
 
     if (!parser.is_valid()) {
-        std::cerr << "[LỖI] PeParser không hợp lệ: " << parser.get_error() << "\n";
+        std::cerr << "[ERROR] PeParser Not Valid: " << parser.get_error() << "\n";
         return features;
     }
 
     const auto& buffer = parser.get_buffer();
-    std::cout << "[INFO] Kích thước file: " << buffer.size() << " bytes\n";
+    std::cout << "[INFO] File size: " << buffer.size() << " bytes\n";
 
     if (buffer.size() < 0x200) {
-        std::cerr << "[LỖI] File quá nhỏ (" << buffer.size() << " bytes)\n";
+        std::cerr << "[ERROR] Filesize too small (" << buffer.size() << " bytes)\n";
         return features;
     }
 
     Disassembler disasm;
     bool is64 = parser.is_64bit();
-    std::cout << "[DEBUG] parser.is_64bit() trả về: " << (is64 ? "true (x64)" : "false (x86)") << "\n";
-    std::cout << "[INFO] File là " << (is64 ? "64-bit" : "32-bit") << "\n";
+    std::cout << "[DEBUG] parser.is_64bit() Result: " << (is64 ? "true (x64)" : "false (x86)") << "\n";
+    std::cout << "[INFO] File is " << (is64 ? "64-bit" : "32-bit") << "\n";
 
     if (!disasm.initialize(is64)) {
-        std::cerr << "[LỖI] Không khởi tạo được Capstone\n";
+        std::cerr << "[ERROR] Failed to initialize Capstone\n";
         return features;
     }
 
     const auto& exec_sections = parser.get_executable_sections();
-    std::cout << "[INFO] Số section có thể thực thi: " << exec_sections.size() << "\n";
+    std::cout << "[INFO] Number of executable sections: " << exec_sections.size() << "\n";
 
     if (exec_sections.empty()) {
-        std::cerr << "[CẢNH BÁO] Không tìm thấy section nào có thuộc tính executable (CODE + EXECUTE)\n";
-        std::cerr << "[GỢI Ý] Kiểm tra Characteristics của các section trong PE bằng CFF Explorer hoặc PE-bear\n";
+        std::cerr << "[WARNING] No executable sections found\n";
+        std::cerr << "[HINT] Check the Characteristics of sections in the PE file using CFF Explorer or PE-bear\n";
         return features;
     }
 
@@ -283,11 +282,11 @@ std::vector<OpcodeFeature> extract_suspicious_opcode_ngrams(
 
     for (const auto& sec : exec_sections) {
         if (sec.raw_size == 0 || sec.raw_offset + sec.raw_size > buffer.size()) {
-            std::cerr << "[LỖI] Section " << sec.name << " có raw offset/size không hợp lệ\n";
+            std::cerr << "[ERROR] Section " << sec.name << " has invalid raw offset/size\n";
             continue;
         }
 
-        std::cout << "[DISASM] Đang disassemble section " << sec.name << " ...\n";
+        std::cout << "[DISASM] Disassembling section " << sec.name << " ...\n";
 
         auto insns = disasm.disassemble(
             buffer.data() + sec.raw_offset,
@@ -297,11 +296,11 @@ std::vector<OpcodeFeature> extract_suspicious_opcode_ngrams(
         );
 
         std::cout << "[DISASM] Section " << sec.name 
-                  << " -> tìm thấy " << insns.size() << " lệnh\n";
+                  << " -> found " << insns.size() << " instructions\n";
 
         if (insns.empty()) {
-            std::cerr << "[CẢNH BÁO] Không disassemble được lệnh nào trong section " << sec.name << "\n";
-            std::cerr << "[NGUYÊN NHÂN CÓ THỂ] Sai bitness, section chứa dữ liệu không phải code, hoặc anti-disasm\n";
+            std::cerr << "[WARNING] No instructions disassembled in section " << sec.name << "\n";
+            std::cerr << "[POSSIBLE REASONS] Incorrect bitness, section contains data rather than code, or anti-disassembly techniques\n";
             continue;
         }
 
@@ -318,8 +317,8 @@ std::vector<OpcodeFeature> extract_suspicious_opcode_ngrams(
             uint64_t va = inst.address;
 
             if (!inst.has_detail) {
-                std::cerr << "[WARN] Lệnh tại 0x" << std::hex << va 
-                          << " không có chi tiết (detail = null)\n";
+                std::cerr << "[WARN] Instruction at 0x" << std::hex << va 
+                          << " has no detail (detail = null)\n";
                 continue;
             }
 
@@ -424,18 +423,18 @@ std::vector<OpcodeFeature> extract_suspicious_opcode_ngrams(
     if (features.size() > cfg.max_features)
         features.resize(cfg.max_features);
 
-    std::cout << "\n[KẾT QUẢ]\n";
-    std::cout << "  Tổng số lệnh disassemble được  : " << total_ins << "\n";
-    std::cout << "  Tổng số n-gram đã đếm          : " << total_ngram_counted << "\n";
-    std::cout << "  Số n-gram unique sau lọc       : " << features.size() << "\n";
-    std::cout << "  Số feature trả về cuối cùng    : " << features.size() << "\n";
+    std::cout << "\n[RESULTS]\n";
+    std::cout << "  Total instructions disassembled  : " << total_ins << "\n";
+    std::cout << "  Total n-grams counted            : " << total_ngram_counted << "\n";
+    std::cout << "  Unique n-grams after filtering   : " << features.size() << "\n";
+    std::cout << "  Final number of features returned: " << features.size() << "\n";
 
     if (features.empty()) {
-        std::cerr << "[KẾT LUẬN] Không tìm thấy n-gram nào → có thể do:\n";
-        std::cerr << "  1. Không có section executable\n";
-        std::cerr << "  2. Disassemble được 0 lệnh\n";
-        std::cerr << "  3. Các block quá ngắn (< n = " << cfg.n << " lệnh)\n";
-        std::cerr << "  4. Không có basic block nào đủ dài\n";
+        std::cerr << "[CONCLUSION] No n-grams found → possible reasons:\n";
+        std::cerr << "  1. No executable sections\n";
+        std::cerr << "  2. Disassembled 0 instructions\n";
+        std::cerr << "  3. Blocks too short (< n = " << cfg.n << " instructions)\n";
+        std::cerr << "  4. No basic blocks long enough\n";
     }
 
     return features;

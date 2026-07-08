@@ -30,6 +30,11 @@ PeParser::PeParser(const std::string& filepath) : filepath_(filepath) {
     valid_ = parse();
 }
 
+PeParser::PeParser(const std::vector<uint8_t>& buffer, const std::string& filepath)
+    : filepath_(filepath), buffer_(buffer) {
+    valid_ = parse();
+}
+
 bool PeParser::parse() {
     if (buffer_.size() < sizeof(IMAGE_DOS_HEADER)) {
         error_msg_ = "File too small for DOS header";

@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstring>
 #include "detect.hpp"
-
 using namespace std;
 
 static const Pattern patterns[] = {
@@ -45,6 +44,12 @@ ScanResult ScanBuffer(const vector<uint8_t>& buffer, size_t entry_point) {
         if (!result.upx && i + 4 <= size) {
             if (memcmp(data + i, "UPX!", 4) == 0) {
                 result.upx = true;
+            }
+        }
+        if (!result.wwpack) {
+            if (i + 0x2a1 < size && memcmp(data + i, "\x8B\x44\x24\x04\x8B\x4C\x24\x08", 8) == 0) {
+                result.wwpack = true;
+                result.score += 40;
             }
         }
         if (!result.fsg && i == entry_point) {

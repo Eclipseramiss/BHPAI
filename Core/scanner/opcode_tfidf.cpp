@@ -6,12 +6,9 @@
 #include "PeParser.hpp"
 #include "Disassembler.hpp"
 
+OpcodeTfidfVectorizer::OpcodeTfidfVectorizer() : OpcodeTfidfVectorizer(TfidfConfig{}) {}
 
-OpcodeTfidfVectorizer::OpcodeTfidfVectorizer()
-    : OpcodeTfidfVectorizer(TfidfConfig{}) {}
-
-OpcodeTfidfVectorizer::OpcodeTfidfVectorizer(const TfidfConfig& cfg)
-    : config(cfg) {}
+OpcodeTfidfVectorizer::OpcodeTfidfVectorizer(const TfidfConfig& cfg) : config(cfg) {}
 
 std::vector<std::string>
 OpcodeTfidfVectorizer::extract_opcodes(const PeParser& parser)
@@ -161,7 +158,6 @@ OpcodeTfidfVectorizer::transform(const std::vector<std::string>& opcodes) const
 
     return vec;
 }
-
 
 OpcodeTfidfVector
 OpcodeTfidfVectorizer::extract_and_vectorize(const PeParser& parser)

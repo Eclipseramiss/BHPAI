@@ -9,6 +9,7 @@ struct ScanResult {
     int score = 0;
     bool upx = false;
     bool fsg = false;
+    bool wwpack = false;
 };
 
 struct Pattern {

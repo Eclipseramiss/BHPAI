@@ -9,6 +9,8 @@
 #include "YaraGen.hpp"
 #include "detect.hpp"
 #include "opcode_tfidf.hpp"
+#include "WWPack.hpp"
+//#include "VM.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -66,7 +68,7 @@ void PDAR(const std::vector<uint8_t>& buffer, const PeHeaderFeatures& feats, uin
             if (offset_in_section >= section->SizeOfRawData)
             {
                 std::cerr << "[!] RVA 0x" << std::hex << rva
-                          << " nằm ngoài raw data của section " << section->Name << "\n";
+                          << " Section: " << section->Name << "\n";
                 return;
             }
 
@@ -78,7 +80,7 @@ void PDAR(const std::vector<uint8_t>& buffer, const PeHeaderFeatures& feats, uin
 
     if (!found)
     {
-        std::cerr << "[!] Không tìm thấy section chứa RVA 0x" << std::hex << rva << "\n";
+        std::cerr << "[!] Not found: 0x" << std::hex << rva << "\n";
         return;
     }
 
@@ -196,7 +198,38 @@ std::vector<std::string> capture_disassembly_for_json(
 
 bool analyze_pe(const std::string& filepath, const std::string& label = "unknown")
 {
-    PeParser parser(filepath);
+    PeParser initial_parser(filepath);
+    if (!initial_parser.is_valid()) {
+        std::cerr << "[ERROR] " << initial_parser.get_error() << "\n";
+        return false;
+    }
+
+    std::vector<uint8_t> active_buffer = initial_parser.get_buffer();
+    uint32_t entry_rva = initial_parser.get_entry_point_rva();
+    bool was_unpacked = false;
+
+    ScanResult initial_scan = ScanBuffer(active_buffer, entry_rva);
+    if (initial_scan.wwpack || WWPackUnpacker::isWWPack(active_buffer)) {
+        std::cout << "[+] Detected WWPack packer. Attempting to unpack...\n";
+        std::vector<uint8_t> unpacked_buffer;
+        if (WWPackUnpacker::unpack(active_buffer, unpacked_buffer)) {
+            std::cout << "[+] Unpack successful! New size: " << unpacked_buffer.size() << " bytes\n";
+            active_buffer = std::move(unpacked_buffer);
+            was_unpacked = true;
+            
+            std::string unpacked_path = filepath + ".unpacked";
+            std::ofstream out_file(unpacked_path, std::ios::binary);
+            if (out_file.is_open()) {
+                out_file.write(reinterpret_cast<const char*>(active_buffer.data()), active_buffer.size());
+                out_file.close();
+                std::cout << "[+] Unpacked binary written to: " << unpacked_path << "\n";
+            }
+        } else {
+            std::cerr << "[WARNING] WWPack unpacking failed. Proceeding with packed binary.\n";
+        }
+    }
+
+    PeParser parser(active_buffer, filepath);
     if (!parser.is_valid()) {
         std::cerr << "[ERROR] " << parser.get_error() << "\n";
         return false;
@@ -233,9 +266,7 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
 
     // === Reloc entropy ===
     double reloc_entropy = 0.0;
-    size_t section_table_offset = feats.e_lfanew + sizeof(IMAGE_NT_HEADERS32) +
-        (feats.magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC ?
-         sizeof(IMAGE_OPTIONAL_HEADER64) - sizeof(IMAGE_OPTIONAL_HEADER32) : 0);
+    size_t section_table_offset = feats.e_lfanew + sizeof(IMAGE_NT_HEADERS32) + (feats.magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC ? sizeof(IMAGE_OPTIONAL_HEADER64) - sizeof(IMAGE_OPTIONAL_HEADER32) : 0);
 
     for (WORD i = 0; i < feats.number_of_sections; ++i) {
         size_t sec_off = section_table_offset + i * sizeof(IMAGE_SECTION_HEADER);
@@ -255,10 +286,14 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
         }
     }
 
-    uint32_t entry_rva = parser.get_entry_point_rva();
+    entry_rva = parser.get_entry_point_rva();
     uint64_t image_base = parser.get_image_base();
 
     ScanResult scan_result = ScanBuffer(buffer, entry_rva);
+    if (was_unpacked) {
+        scan_result.wwpack = true;
+        scan_result.score += 40;
+    }
 
     // === Opcode n-grams ===
     std::vector<OpcodeFeature> opcode_features;
@@ -283,9 +318,6 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
         opcode_features.clear();
     }
     
-
-
-    // ==================== HUMAN READABLE REPORT (std::cout) ====================
     std::cout << "\n=== PE Analysis Report ===\n";
     std::cout << "File:       " << filepath << "\n";
     std::cout << "Size:       " << filesize << " bytes\n";
@@ -550,6 +582,10 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
         std::cerr << "[ERROR] Exception occurred while generating YARA rule: " << e.what() << "\n";
     }
 
+    //std::cout << "\n=== VM SANDBOX SIMULATION ===\n";
+    //VM vm("MalwareVM", "Windows10.iso", 2048);
+    //vm.start();
+
     std::cout << "\n=== ANALYSIS COMPLETED ===\n";
 
     auto json_out = features_to_json(feats, hashes, filepath, filesize,
@@ -571,10 +607,7 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
     }
     json_out["top_suspicious_ngrams"] = std::move(top_ngrams);
     json_out["opcode_tfidf"] = tfidf_result.to_json(50);
-
-    json_out["disassembly_near_ep"] = capture_disassembly_for_json(
-        buffer, feats, feats.address_of_entry_point, 768, 220);
-    
+    json_out["disassembly_near_ep"] = capture_disassembly_for_json(buffer, feats, feats.address_of_entry_point, 768, 220);
     json_out["string_analysis"]   = std::move(string_analysis);
     json_out["sections"]          = std::move(section_list);
     json_out["label"]             = label;                    // "malware" or "benign"
@@ -582,6 +615,7 @@ bool analyze_pe(const std::string& filepath, const std::string& label = "unknown
     json_out["filename"]          = filepath;
     json_out["is_upx"]            = scan_result.upx;
     json_out["is_fsg"]            = scan_result.fsg;
+    json_out["is_wwpack"]         = scan_result.wwpack;
     json_out["score"]             = scan_result.score;
 
     std::string json_str = json_out.dump(2);

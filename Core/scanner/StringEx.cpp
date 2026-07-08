@@ -142,7 +142,6 @@ bool is_Caesar(const string& s) {
     return false;
 }
 
-
 void brute_xor_all(const vector<uint8_t>& data) {
     if (data.size() < 8) return;
     for (int key = 0; key < 256; ++key) {
