@@ -12,6 +12,7 @@ import pandas as pd
 import magic
 import numpy as np
 import joblib
+import uvicorn
 
 app = FastAPI(title="Malware Detector API")
 
@@ -22,8 +23,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ====================== CONFIG ======================
 
 def get_resource_path(relative_path):
     try:
@@ -42,39 +41,36 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 scan_results = {}
 
-# ====================== HELPER FUNCTIONS ======================
 def verify_pe_integrity(exe_path: str) -> bool:
-
     try:
         mime = magic.from_file(str(exe_path), mime=True)
         is_valid = mime == 'application/x-dosexec'
         if not is_valid:
-            print(f"⚠️ MIME type validation failed: {mime} (expected: application/x-dosexec)")
+            print(f"MIME type validation failed: {mime} (expected: application/x-dosexec)")
         return is_valid
     except Exception as e:
-        print(f"❌ Error checking MIME type: {e}")
+        print(f"Error checking MIME type: {e}")
         return False
 
-# ====================== LOAD MODEL & FEATURES ======================
-print("Đang load model và selected features...")
+print("Loading model and selected features...")
 try:
     model = joblib.load(MODEL_PATH)
     with open(FEATURES_PATH, 'r', encoding='utf-8') as f:
         selected_features = [line.strip() for line in f.readlines() if line.strip()]
-    print(f"✅ Model loaded thành công! Số features: {len(selected_features)}")
+    print(f"Model loaded successfully! Number of features: {len(selected_features)}")
 except Exception as e:
-    print(f"❌ Lỗi load model/features: {e}")
+    print(f"Error loading model/features: {e}")
     raise
 
 def extract_features_from_json(data: dict) -> dict:
     features = {}
     
-    # 1. Entropy & structural features
     features['code_section_entropy'] = data.get('code_section_entropy', 0.0)
     features['relocation_entropy'] = data.get('relocation_entropy', 0.0)
+    features['code_ratio'] = data.get('code_ratio', 0.0)
     
     sections = data.get('sections', [])
-    features['num_sections'] = len(sections)
+    features['num_sections'] = data.get('num_sections', len(sections))
     if sections:
         entropies = [s.get('entropy', 0) for s in sections]
         features['max_section_entropy'] = max(entropies) if entropies else 0.0
@@ -87,43 +83,60 @@ def extract_features_from_json(data: dict) -> dict:
         features['mean_section_entropy'] = 0.0
         features['std_section_entropy'] = 0.0
     
-    features['code_ratio'] = data.get('code_ratio', 0.0)
     features['overlay_size_bytes'] = data.get('overlay_size_bytes', 0)
     features['resource_size'] = data.get('resource_size', 0)
-    features['overlay_ratio'] = features['overlay_size_bytes'] / max(1, data.get('size_bytes', 1))
+    size_bytes = data.get('size_bytes', 1)
+    features['overlay_ratio'] = features['overlay_size_bytes'] / max(1, size_bytes)
 
-    # 2. Import & API
     features['import_function_count'] = data.get('import_function_count', 0)
+    features['import_rva'] = data.get('import_rva', 0)
+    features['import_size'] = data.get('import_size', 0)
     features['suspicious_api_count'] = data.get('suspicious_api_count', 0)
     features['suspicious_api_ratio'] = data.get('suspicious_api_ratio', 0.0)
 
-    # 3. Ngrams
+    features['e_lfanew'] = data.get('e_lfanew', 0)
+    features['entry_point_rva'] = data.get('entry_point_rva', 0)
+    features['file_alignment'] = data.get('file_alignment', 0)
+    features['image_base'] = data.get('image_base', 0)
+    features['machine'] = data.get('machine', 0)
+    features['magic'] = data.get('magic', 0)
+
+    bool_flags = [
+        'alignment_weird', 'aslr_enabled', 'cfg_enabled', 'checksum_zero', 
+        'digital_signature_valid', 'e_lfanew_not_aligned', 'e_lfanew_too_large',
+        'has_debug', 'has_http_post_exfil', 'has_luhn_or_cc_validation', 
+        'has_mutex_persistence', 'has_signature', 'has_tls', 'has_track_pattern_strings',
+        'is_console', 'is_dll', 'is_fsg', 'is_gui', 'is_invalid_dos', 'is_upx', 
+        'is_wwpack', 'likely_pos_scraper', 'no_imports', 'nx_enabled', 
+        'has_memory_scraping_apis'
+    ]
+    for flag in bool_flags:
+        features[flag] = int(bool(data.get(flag, False)))
+
     ngrams = data.get('top_suspicious_ngrams', [])
     features['top_suspicious_ngrams_count'] = len(ngrams)
-    features['suspicious_ngrams_high_count'] = sum(1 for n in ngrams if n.get('count', 0) > 100)
-    features['suspicious_ngrams_total_weight'] = sum(n.get('weight', 0) for n in ngrams)
+    if ngrams:
+        features['suspicious_ngrams_high_count'] = sum(1 for n in ngrams if n.get('count', 0) > 100)
+        features['suspicious_ngrams_total_weight'] = sum(n.get('weight', 0) for n in ngrams)
+    else:
+        features['suspicious_ngrams_high_count'] = 0
+        features['suspicious_ngrams_total_weight'] = 0.0
     
-    features['opcode_ngrams_total'] = data.get('opcode_ngrams', {}).get('total_ngrams_found', 0)
+    opcode_info = data.get('opcode_ngrams', {})
+    features['opcode_ngrams_total'] = opcode_info.get('total_ngrams_found', len(opcode_info.get('opcode_ngrams', [])))
+    features['approx_instructions_analyzed'] = opcode_info.get('approx_instructions_analyzed', 0)
 
-    # 4. Strings
     str_info = data.get('string_analysis', {})
     features['total_strings'] = str_info.get('total_strings_found', 0)
     interesting = str_info.get('interesting_strings', [])
     features['interesting_strings_count'] = len(interesting)
     features['interesting_strings_ratio'] = len(interesting) / max(1, features['total_strings'])
 
-    # 5. Boolean flags
-    features['has_memory_scraping_apis'] = int(data.get('has_memory_scraping_apis', False))
-    features['has_tls'] = int(data.get('has_tls', False))
-    features['is_gui'] = int(data.get('is_gui', False))
-    features['is_dll'] = int(data.get('is_dll', False))
-
     return features
 
-# ====================== RUN PE ANALYZER ======================
 def run_pe_analyzer(exe_path: str) -> dict:
     try:
-        print(f"🔍 Đang chạy pe.exe phân tích: {os.path.basename(exe_path)}")
+        print(f"Running pe.exe analyzer: {os.path.basename(exe_path)}")
         
         result = subprocess.run(
             [PE_TOOL, exe_path],
@@ -134,16 +147,16 @@ def run_pe_analyzer(exe_path: str) -> dict:
         )
         
         if result.returncode != 0:
-            print(f"⚠️ pe.exe warning: {result.stderr.decode(errors='ignore')[:500]}")
+            print(f"pe.exe warning: {result.stderr.decode(errors='ignore')[:500]}")
 
         json_files = list(UPLOAD_DIR.glob("*.json"))
         if not json_files:
-            raise Exception("Không tìm thấy file JSON output từ pe.exe")
+            raise Exception("No JSON output file found from pe.exe")
 
         target_json = max(json_files, key=lambda x: x.stat().st_mtime)
         
         if target_json.stat().st_size < 300:
-            raise Exception(f"File JSON output quá nhỏ ({target_json.stat().st_size} bytes)")
+            raise Exception(f"JSON output file is too small ({target_json.stat().st_size} bytes)")
 
         with open(target_json, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -160,11 +173,8 @@ def run_pe_analyzer(exe_path: str) -> dict:
     except Exception as e:
         raise Exception(f"Lỗi chạy pe.exe: {str(e)}")
 
-# ====================== BACKGROUND SCANNING TASK ======================
 async def process_scan_background(scan_id: str, temp_exe: Path, filename: str, threshold: float):
-
     try:
-        # Update status: scanning
         scan_results[scan_id]["status"] = "scanning"
         scan_results[scan_id]["progress"] = "Running PE analyzer..."
 
@@ -194,10 +204,10 @@ async def process_scan_background(scan_id: str, temp_exe: Path, filename: str, t
             "import_function_count": pe_data.get("import_function_count"),
             "scan_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         })
-        print(f"✅ Hoàn tất | scan_id={scan_id} | Prob={prob:.4f} | {'MALWARE' if is_malware else 'BENIGN'}")
+        print(f"Completed | scan_id={scan_id} | Prob={prob:.4f} | {'MALWARE' if is_malware else 'BENIGN'}")
 
     except Exception as e:
-        print(f"❌ [ERROR] Scan {scan_id}: {str(e)}")
+        print(f"[ERROR] Scan {scan_id}: {str(e)}")
         scan_results[scan_id].update({
             "status": "error",
             "error_message": str(e),
@@ -211,12 +221,10 @@ async def process_scan_background(scan_id: str, temp_exe: Path, filename: str, t
             except:
                 pass
 
-# ====================== SCAN ENDPOINT ======================
 @app.post("/scan")
 async def scan_file(file: UploadFile = File(...), threshold: float = Form(0.65), background_tasks: BackgroundTasks = BackgroundTasks()):
-    # Quick extension check
     if not file.filename.lower().endswith('.exe'):
-        raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file .exe")
+        raise HTTPException(status_code=400, detail="Only .exe files are allowed")
 
     scan_id = f"scan_{os.urandom(8).hex()}"
     temp_exe = UPLOAD_DIR / f"{scan_id}_{file.filename}"
@@ -225,7 +233,7 @@ async def scan_file(file: UploadFile = File(...), threshold: float = Form(0.65),
         with open(temp_exe, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        print(f"📤 Nhận file: {file.filename} | scan_id: {scan_id}")
+        print(f"Received file: {file.filename} | scan_id: {scan_id}")
 
         if not verify_pe_integrity(str(temp_exe)):
             temp_exe.unlink(missing_ok=True)
@@ -256,33 +264,28 @@ async def scan_file(file: UploadFile = File(...), threshold: float = Form(0.65),
             "status": "queued",
             "message": "Scan started in background. Use /scan/result/{scan_id} to check status",
             "created_time": scan_results[scan_id]["created_time"],
-        }, status_code=202)  # 202 Accepted
+        }, status_code=202)
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ [ERROR] Scan {file.filename}: {str(e)}")
+        print(f"[ERROR] Scan {file.filename}: {str(e)}")
         if temp_exe.exists():
             try:
                 temp_exe.unlink(missing_ok=True)
             except:
                 pass
-        raise HTTPException(status_code=500, detail=f"Lỗi upload/validate file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading/validating file: {str(e)}")
 
-# ====================== GET RESULT ======================
 @app.get("/scan/result/{scan_id}")
 async def get_scan_result(scan_id: str):
-
     if scan_id not in scan_results:
-        raise HTTPException(status_code=404, detail="Không tìm thấy kết quả quét")
+        raise HTTPException(status_code=404, detail="Not found scan result")
     
     result = scan_results[scan_id]
-    
-    # Return 202 Accepted if still processing
     if result["status"] in ["queued", "scanning"]:
         return JSONResponse(result, status_code=202)
     
-    # Return 200 OK if completed or 500 if error
     status_code = 200 if result["status"] not in ["error"] else 500
     return JSONResponse(result, status_code=status_code)
 
@@ -292,9 +295,9 @@ async def root():
         "message": "Malware Detector API (Async + Security Enhanced)",
         "model_features": len(selected_features),
         "security_notes": [
-            "✅ MIME type verification (magic library)",
-            "✅ PE executable integrity check",
-            "✅ Background task processing (non-blocking)",
+            "MIME type verification (magic library)",
+            "PE executable integrity check",
+            "Background task processing (non-blocking)",
         ],
         "endpoints": {
             "scan": "POST /scan (file + threshold optional) - Returns 202 Accepted, scan runs in background",
@@ -303,5 +306,4 @@ async def root():
     }
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
