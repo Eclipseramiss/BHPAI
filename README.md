@@ -1,27 +1,47 @@
 # BHPAI
 
-# Introduction
+## Introduction
 
-**BHPAI** is a static malware detection framework designed for Windows Portable Executable (PE) files. The project combines low-level PE analysis with machine learning to identify malicious executables based on structural characteristics, entropy statistics, import behavior, opcode patterns, and other static features.
+**BHPAI (Behavioral & Heuristic PE Artificial Intelligence)** is a modular static malware analysis framework for Windows Portable Executable (PE) files. The framework combines native PE analysis, automatic executable unpacking, handcrafted feature engineering, machine learning inference, explainable artificial intelligence, and heuristic YARA rule generation into a unified analysis pipeline.
 
-Unlike traditional signature-based antivirus engines, BHPAI does not rely on hash matching or predefined malware signatures. Instead, it extracts a comprehensive set of handcrafted features from PE files and uses a pre-trained LightGBM classifier to estimate the probability that a file is malicious.
+Unlike traditional signature-based antivirus engines, BHPAI does not rely on signature databases or hash matching. Instead, it extracts a comprehensive set of static characteristics from PE files and uses a pre-trained LightGBM classifier to estimate the probability that a file is malicious.
 
-The feature extraction engine is implemented in C++ for high performance and includes support for:
+To improve analysis accuracy, BHPAI automatically detects supported executable packers and restores packed executables before feature extraction, allowing the classifier to analyze the original program structure rather than compressed or obfuscated data.
+
+The feature extraction engine is implemented entirely in **C++** for high-performance offline analysis and currently supports:
 
 * PE header and section analysis
-* Import and API statistics
-* Resource inspection
+* Import table and API statistics
+* Resource directory analysis
 * Overlay detection
 * Entropy analysis
-* String analysis
+* String extraction and analysis
 * Opcode/API n-gram extraction using Capstone
 * Control-flow related PE characteristics
+* Automatic UPX unpacking (NRV2B/NRV2D/NRV2E)
+* Automatic WWPack unpacking
 
-To improve generalization, the training pipeline removes known leakage features, performs feature selection, optimizes the decision threshold, and evaluates the model using multiple performance metrics including Accuracy, Precision, Recall, F1-score, ROC-AUC, PR-AUC, and MCC.
+BHPAI also provides:
 
-BHPAI also provides explainable predictions through SHAP analysis, allowing users to understand which static characteristics contribute most to each classification result.
+* **AI-powered malware classification** using a pre-trained LightGBM model
+* **Explainable AI (SHAP)** to identify the most influential features behind each prediction
+* **Automatic heuristic YARA rule generation** based on PE metadata, imported APIs, extracted strings, entropy characteristics, and behavioral indicators
+* **Threat scoring** with confidence estimation and human-readable analysis reports
 
-The project is intended for malware research, educational purposes, and offline static analysis. It is not designed to replace traditional antivirus software or dynamic malware analysis.
+The training pipeline is designed to improve model generalization by removing known data leakage features, performing feature selection, optimizing the decision threshold, and evaluating the classifier using multiple metrics, including:
+
+* Accuracy
+* Precision
+* Recall
+* F1-score
+* ROC-AUC
+* PR-AUC
+* MCC
+* Cohen's Kappa
+* Balanced Accuracy
+* G-Mean
+
+BHPAI is intended for malware research, reverse engineering, digital forensics, security education, and offline static malware analysis. It is designed as a research-oriented analysis framework and should complement, rather than replace, traditional antivirus solutions and dynamic malware analysis.
 
 ## Dataset
 
