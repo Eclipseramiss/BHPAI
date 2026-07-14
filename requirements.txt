@@ -1,0 +1,5 @@
+pandas
+python-magic-bin
+numpy
+joblib
+scikit-learn
