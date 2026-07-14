@@ -118,3 +118,6 @@ This is particularly important in malware detection, where datasets are often im
 * 2 uncommon installers
 
 **Most false positives are caused by high code entropy and compressed commercial software**
+
+# Usage
+**py bhpai.py <filepath.exe>**
