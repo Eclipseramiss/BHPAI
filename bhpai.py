@@ -37,11 +37,11 @@ def verify_pe_integrity(exe_path: str) -> bool:
 
 def extract_features_from_json(data: dict, selected_features, api_ngram_features) -> dict:
     features = {}
-    
+
     features['code_section_entropy'] = data.get('code_section_entropy', 0.0)
     features['relocation_entropy']   = data.get('relocation_entropy', 0.0)
     features['code_ratio']           = data.get('code_ratio', 0.0)
-    
+
     sections = data.get('sections', [])
     features['num_sections'] = data.get('num_sections', len(sections))
     if sections:
@@ -55,18 +55,83 @@ def extract_features_from_json(data: dict, selected_features, api_ngram_features
         features['min_section_entropy']  = 0.0
         features['mean_section_entropy'] = 0.0
         features['std_section_entropy']  = 0.0
+
     features['overlay_size_bytes'] = data.get('overlay_size_bytes', 0)
     features['resource_size']      = data.get('resource_size', 0)
     features['num_resources']      = data.get('num_resources', 0)
     features['resource_entropy']   = data.get('resource_entropy', 0.0)
     size_bytes = data.get('size_bytes', 1)
-    features['overlay_ratio']  = features['overlay_size_bytes'] / max(1, size_bytes)
+    features['overlay_ratio'] = features['overlay_size_bytes'] / max(1, size_bytes)
     features['resource_ratio'] = features['resource_size'] / max(1, size_bytes)
+
+    features['resource_total']              = data.get('resource_total', 0)
+    features['resource_icon_count']         = data.get('resource_icon_count', 0)
+    features['resource_cursor_count']       = data.get('resource_cursor_count', 0)
+    features['resource_bitmap_count']       = data.get('resource_bitmap_count', 0)
+    features['resource_dialog_count']       = data.get('resource_dialog_count', 0)
+    features['resource_menu_count']         = data.get('resource_menu_count', 0)
+    features['resource_stringtable_count']  = data.get('resource_stringtable_count', 0)
+    features['resource_accelerator_count']  = data.get('resource_accelerator_count', 0)
+    features['resource_manifest_count']     = data.get('resource_manifest_count', 0)
+    features['resource_version_count']      = data.get('resource_version_count', 0)
+    features['resource_rcdata_count']       = data.get('resource_rcdata_count', 0)
+    features['resource_other_count']        = data.get('resource_other_count', 0)
+
+    features['resource_entropy_mean'] = data.get('resource_entropy_mean', 0.0)
+    features['resource_entropy_max']  = data.get('resource_entropy_max', 0.0)
+    features['resource_entropy_std']  = data.get('resource_entropy_std', 0.0)
+
+    manifest_present = int(bool(data.get("manifest_present", False)))
+    manifest_size = data.get("manifest_size", 0)
+    features["manifest_present"] = manifest_present
+    features["manifest_size_log"] = np.log1p(manifest_size) if manifest_present else 0.0
+    features['manifest_entropy'] = data.get('manifest_entropy', 0.0)
+
+    if 'manifest_execution_level' in data:
+        features['manifest_execution_level'] = data['manifest_execution_level']
+    elif data.get('manifest_requested_admin'):
+        features['manifest_execution_level'] = 3
+    else:
+        features['manifest_execution_level'] = 0
+
+    features['manifest_uiaccess']            = int(bool(data.get('manifest_uiaccess', False)))
+    features['manifest_auto_elevate']        = int(bool(data.get('manifest_auto_elevate', False)))
+    features['manifest_requested_privilege'] = data.get('manifest_requested_privilege', 0)
+    features['manifest_has_dpi']             = int(bool(data.get('manifest_has_dpi', False)))
+    features['manifest_has_com']             = int(bool(data.get('manifest_has_com', False)))
+    features['manifest_has_dependencies']    = int(bool(data.get('manifest_has_dependencies', False)))
+    features['manifest_dependency_count']    = data.get('manifest_dependency_count', 0)
+
+    features['certificate_present'] = int(bool(data.get('certificate_present', False)))
+    if 'certificate_count' in data:
+        features['certificate_count'] = data['certificate_count']
+    elif features['certificate_present'] or data.get('certificate_size', 0) > 0:
+        features['certificate_count'] = 1
+    else:
+        features['certificate_count'] = 0
+
+    features['has_version_info']              = int(bool(data.get('has_version_info', False)))
+    features['version_company_name_length']   = data.get('version_company_name_length', 0)
+    features['version_product_name_length']   = data.get('version_product_name_length', 0)
+    features['version_description_length']    = data.get('version_description_length', 0)
+    features['version_original_filename_len'] = data.get('version_original_filename_len', 0)
+    features['version_product_version_len']   = data.get('version_product_version_len', 0)
+
+    features['rich_header_present'] = int(bool(data.get('rich_header_present', False)))
+    features['rich_header_entries'] = data.get('rich_header_entries', 0)
+    features['rich_has_vs2015']     = int(bool(data.get('rich_has_vs2015', False)))
+    features['rich_has_vs2017']     = int(bool(data.get('rich_has_vs2017', False)))
+    features['rich_has_vs2019']     = int(bool(data.get('rich_has_vs2019', False)))
+    features['rich_has_vs2022']     = int(bool(data.get('rich_has_vs2022', False)))
+    features['rich_has_masm']       = int(bool(data.get('rich_has_masm', False)))
+    features['rich_has_cvtres']     = int(bool(data.get('rich_has_cvtres', False)))
+
     features['import_function_count'] = data.get('import_function_count', 0)
     features['import_rva']            = data.get('import_rva', 0)
     features['import_size']           = data.get('import_size', 0)
     features['suspicious_api_count']  = data.get('suspicious_api_count', 0)
     features['suspicious_api_ratio']  = data.get('suspicious_api_ratio', 0.0)
+
     api_flags = [
         'has_VirtualAlloc', 'has_VirtualProtect', 'has_WriteProcessMemory',
         'has_ReadProcessMemory', 'has_CreateRemoteThread', 'has_NtMapViewOfSection',
@@ -76,27 +141,36 @@ def extract_features_from_json(data: dict, selected_features, api_ngram_features
     ]
     for flag in api_flags:
         features[flag] = int(bool(data.get(flag, False)))
+
     features['e_lfanew']        = data.get('e_lfanew', 0)
     features['entry_point_rva'] = data.get('entry_point_rva', 0)
     features['file_alignment']  = data.get('file_alignment', 0)
+    features['image_base']      = data.get('image_base', 0)
+    features['machine']         = data.get('machine', 0)
+    features['magic']           = data.get('magic', 0)
+
     bool_flags = [
-        'alignment_weird', 'aslr_enabled', 'e_lfanew_not_aligned', 'e_lfanew_too_large',
-        'has_http_post_exfil', 'has_luhn_or_cc_validation', 
+        'alignment_weird', 'aslr_enabled', 'cfg_enabled', 'checksum_zero',
+        'digital_signature_valid', 'e_lfanew_not_aligned', 'e_lfanew_too_large',
+        'has_debug', 'has_http_post_exfil', 'has_luhn_or_cc_validation',
         'has_mutex_persistence', 'has_signature', 'has_tls', 'has_track_pattern_strings',
-        'is_console', 'is_dll', 'is_fsg', 'is_gui', 'is_invalid_dos', 'is_upx', 
-        'is_wwpack', 'likely_pos_scraper', 'no_imports', 'nx_enabled', 
+        'is_console', 'is_dll', 'is_fsg', 'is_gui', 'is_invalid_dos', 'is_upx',
+        'is_wwpack', 'likely_pos_scraper', 'no_imports', 'nx_enabled',
         'has_memory_scraping_apis'
     ]
     for flag in bool_flags:
         features[flag] = int(bool(data.get(flag, False)))
 
     ngrams = data.get('top_suspicious_ngrams', [])
-    features['top_suspicious_ngrams_count'] = len(ngrams)
-    features['suspicious_ngrams_high_count'] = sum(1 for n in ngrams if n.get('count', 0) > 100) if ngrams else 0
-    features['suspicious_ngrams_total_weight'] = sum(n.get('weight', 0) for n in ngrams) if ngrams else 0.0
+    features['top_suspicious_ngrams_count']  = len(ngrams)
+    features['suspicious_ngrams_high_count'] = sum(1 for n in ngrams if n.get('count', 0) > 100)
+    features['suspicious_ngrams_total_weight'] = sum(n.get('weight', 0) for n in ngrams)
+
     opcode_info = data.get('opcode_ngrams', {})
-    features['opcode_ngrams_total'] = opcode_info.get('total_ngrams_found', len(opcode_info.get('opcode_ngrams', [])))
+    features['opcode_ngrams_total'] = opcode_info.get('total_ngrams_found',
+                                                      len(opcode_info.get('opcode_ngrams', [])))
     features['approx_instructions_analyzed'] = opcode_info.get('approx_instructions_analyzed', 0)
+
     cfg_info = data.get('CFG', {})
     features['cfg_build_success']         = int(bool(cfg_info.get('build_success', False)))
     features['cfg_num_basic_blocks']      = cfg_info.get('num_basic_blocks', 0)
@@ -108,14 +182,15 @@ def extract_features_from_json(data: dict, selected_features, api_ngram_features
     features['cfg_max_call_depth']        = cfg_info.get('max_call_depth', 0)
     features['cfg_recursive_function_count'] = cfg_info.get('recursive_function_count', 0)
     features['cfg_back_edge_ratio']       = cfg_info.get('back_edge_ratio', 0.0)
-    features['cfg_jump_density']          = cfg_info.get('jump_density', 0.0)
-    features['cfg_branch_density']        = cfg_info.get('branch_density', 0.0)
+    features['cfg_jump_density']          = cfg_info.get('cfg_jump_density', 0.0)
+    features['cfg_branch_density']        = cfg_info.get('cfg_branch_density', 0.0)
     features['cfg_indirect_control_flow'] = cfg_info.get('indirect_control_flow', 0)
     features['cfg_indirect_call_ratio']   = cfg_info.get('indirect_call_ratio', 0.0)
     features['cfg_call_count']            = cfg_info.get('call_count', 0)
     features['cfg_avg_block_size']        = cfg_info.get('avg_block_size', 0.0)
     features['cfg_has_loops']             = int(bool(cfg_info.get('has_loops', False)))
     features['cfg_unreachable_blocks']    = cfg_info.get('unreachable_blocks', 0)
+
     str_info = data.get('string_analysis', {})
     features['total_strings']             = str_info.get('total_strings_found', 0)
     interesting = str_info.get('interesting_strings', [])
@@ -146,7 +221,6 @@ def extract_features_from_json(data: dict, selected_features, api_ngram_features
         repeat_ratio = (1.0 - unique_calls / max(1, seq_len) if seq_len > 0 else 0.0)
     features['api_repeat_ratio'] = float(repeat_ratio)
     features['api_sequence_present'] = int(bool(seq))
-
     counts = np.array(list(api_ng.values()))
     if counts.sum() > 0:
         probs = counts / counts.sum()
@@ -169,6 +243,7 @@ def extract_features_from_json(data: dict, selected_features, api_ngram_features
 
     return features
 
+
 def run_pe_analyzer(exe_path: str, temp_dir: Path) -> dict:
     try:
         abs_exe_path = os.path.abspath(exe_path)
@@ -177,7 +252,7 @@ def run_pe_analyzer(exe_path: str, temp_dir: Path) -> dict:
         if not os.path.exists(abs_pe_tool):
             raise Exception(f"PE analyzer tool not found at: {abs_pe_tool}")
         result = subprocess.run(
-            [abs_pe_tool, abs_exe_path],
+            [abs_pe_tool, abs_exe_path, "--safe-run"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=abs_temp_dir,
@@ -205,7 +280,6 @@ def run_pe_analyzer(exe_path: str, temp_dir: Path) -> dict:
             target_json.unlink()
         except:
             pass
-        
         return data
     except subprocess.TimeoutExpired:
         raise Exception("pe.exe timeout (exceeded 3 minutes)")
@@ -228,7 +302,6 @@ def main():
     if not exe_path.suffix.lower() == '.exe':
         print("Error: Only .exe files are allowed for analysis.")
         sys.exit(1)
-
     print(f"Analyzing: {exe_path.name}")
     if not verify_pe_integrity(str(exe_path)):
         print("Error: File is not a valid PE executable (MIME type verification failed).")
@@ -239,11 +312,13 @@ def main():
     try:
         temp_exe = temp_dir / exe_path.name
         shutil.copy2(exe_path, temp_exe)
+
         if not os.path.exists(MODEL_PATH) or not os.path.exists(FEATURES_PATH):
             print(f"Error: Missing dependency files.")
             print(f"    Expected model path: {MODEL_PATH}")
             print(f"    Expected features path: {FEATURES_PATH}")
             sys.exit(1)
+
         print("Loading Model & Features list...")
         model = joblib.load(MODEL_PATH)
         with open(FEATURES_PATH, 'r', encoding='utf-8') as f:
@@ -254,6 +329,7 @@ def main():
             for feat in selected_features
             if feat.startswith(API_NGRAM_PREFIX)
         ]
+
         print("Running PE Analyzer (Extracting static features)...")
         pe_data = run_pe_analyzer(str(temp_exe), temp_dir)
 
@@ -263,24 +339,26 @@ def main():
         for col in selected_features:
             if col not in df.columns:
                 df[col] = 0.0
+
         df = df[selected_features].fillna(0)
         log_cols = ['api_seq_length', 'api_unique_calls', 'api_total_transitions', 'api_unique_transitions']
         for col in log_cols:
             if col in df.columns:
                 df[col] = np.log1p(df[col].clip(lower=0))
-
         api_cols = [c for c in df.columns if c.startswith(API_NGRAM_PREFIX)]
         if api_cols:
             df[api_cols] = df[api_cols].astype(np.float64)
             tfidf = TfidfTransformer()
             df_api_tfidf = tfidf.fit_transform(df[api_cols])
             df[api_cols] = df_api_tfidf.toarray()
+
         print("Running LightGBM Predictor...")
         prob = float(model.predict(df)[0])
         is_malware = prob > args.threshold
         result_status = "MALWARE" if is_malware else "BENIGN (SAFE)"
         color_code = "\033[91m" if is_malware else "\033[92m"
         reset_code = "\033[0m"
+
         print("=" * 60)
         try:
             print(f"ANALYSIS RESULT: {color_code}{result_status}{reset_code}")
@@ -295,6 +373,7 @@ def main():
         print(f"Imported Functions:  {pe_data.get('import_function_count', 'N/A')}")
         print(f"Scan Time:           {time.strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 60)
+
         if args.output:
             report_data = {
                 "file_name": exe_path.name,
@@ -319,6 +398,7 @@ def main():
     finally:
         if temp_dir.exists():
             shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     main()
