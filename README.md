@@ -418,54 +418,7 @@ python bhpai.py suspicious.exe
 
 # Architecture
 
-```text
-                    PE File
-                       │
-                       ▼
-              ┌─────────────────┐
-              │  PE Detection    │
-              └────────┬────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ Packer Detection │
-              └────────┬────────┘
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
-   Packed Executable          Normal Executable
-          │                         │
-          ▼                         │
-    Automatic Unpacking             │
-          │                         │
-          └────────────┬────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ C++ PE Analyzer  │
-              └────────┬────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ Feature Extraction│
-              └────────┬────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │ LightGBM Model   │
-              └────────┬────────┘
-                       │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-      Prediction      SHAP       YARA
-       Score       Explanation   Rules
-          │            │            │
-          └────────────┴────────────┘
-                       │
-                       ▼
-                 Final Report
-```
+<img width="1408" height="768" alt="t" src="https://github.com/user-attachments/assets/1a8b97a0-490c-4f0d-a0c1-6ebeb24017c9" />
 
 ---
 
