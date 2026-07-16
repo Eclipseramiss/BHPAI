@@ -297,39 +297,6 @@ BHPAI therefore uses iterative hard-negative analysis to identify these cases an
 
 ---
 
-# False Positive Reduction
-
-The training dataset has been progressively expanded with difficult benign samples.
-
-A previous evaluation produced:
-
-* **15 FP**
-* **1.93% FPR**
-
-After adding approximately **280 additional benign samples**, the latest evaluation produced:
-
-* **7 FP**
-* **0.84% FPR**
-
-This represents approximately a **53% reduction in false positives** while maintaining approximately **98% malware recall**.
-
-The iterative process is:
-
-```text
-Train Model
-     ↓
-Analyze False Positives
-     ↓
-Verify Legitimate Files
-     ↓
-Add Hard Benign Samples
-     ↓
-Retrain
-     ↓
-Evaluate Again
-```
-
-This process helps BHPAI learn that characteristics such as high entropy, missing manifests, or absent overlays are not independently sufficient to classify a file as malicious.
 
 ---
 
