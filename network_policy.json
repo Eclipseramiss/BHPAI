@@ -1,0 +1,11 @@
+{
+  "fake_dns_enabled": true,
+  "fake_dns_ip": "127.0.0.1",
+  "fake_dns_ipv6": "::1",
+  "redirect_traffic_enabled": true,
+  "redirect_ip": "127.0.0.1",
+  "redirect_ip_ipv6": "::1",
+  "redirect_port": 8080,
+  "blocked_ports": "22,23,25,445",
+  "bandwidth_limit_kbps": 0
+}
