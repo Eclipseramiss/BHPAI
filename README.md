@@ -2,33 +2,33 @@
 
 ## Introduction
 
-**BHPAI** is a modular static malware analysis framework for Windows Portable Executable (PE) files.
+**BHPAI** is a modular malware analysis framework for Windows Portable Executable (PE) files that combines **static analysis** and **dynamic behavioral sandboxing** into a unified research pipeline.
 
-The framework combines:
+The framework integrates:
 
-* Native PE analysis
+* Native PE structural analysis
 * Automatic executable unpacking
-* Handcrafted feature engineering
-* Machine learning inference
-* Explainable Artificial Intelligence
+* Handcrafted static feature engineering
+* Machine learning inference (LightGBM)
+* Explainable Artificial Intelligence (SHAP)
 * Heuristic YARA rule generation
+* **User-mode dynamic behavioral sandbox with filesystem & registry virtualization**
 
-into a unified offline analysis pipeline.
+Unlike traditional signature-based antivirus engines, BHPAI does not primarily rely on signature databases or hash matching. Instead, it extracts a comprehensive set of structural, statistical, and behavioral indicators and uses a pre-trained **LightGBM classifier** to estimate the probability that a file is malicious.
 
-Unlike traditional signature-based antivirus engines, BHPAI does not primarily rely on signature databases or hash matching. Instead, it extracts a comprehensive set of structural, statistical, and behavioral indicators from PE files and uses a pre-trained **LightGBM classifier** to estimate the probability that a file is malicious.
+To improve analysis accuracy, BHPAI automatically detects supported executable packers and attempts to restore packed executables before feature extraction. Complementary to the static pipeline, the **dynamic sandbox** executes the sample in a controlled, virtualized environment, records fine-grained API-level behavior, correlates multi-stage techniques (drop-and-execute, reflective loading, process injection, persistence, etc.), and produces a behavior risk score together with detailed event logs.
 
-To improve analysis accuracy, BHPAI automatically detects supported executable packers and attempts to restore packed executables before feature extraction. This allows the classifier to analyze the underlying program structure rather than relying solely on compressed or obfuscated data.
-
-The feature extraction engine is implemented entirely in **C++** for high-performance offline analysis.
+The static feature extraction engine and the dynamic monitor are both implemented in **C++** for high performance.
 
 ---
 
 ## Core Analysis Capabilities
 
+### Static Analysis Components
+
 BHPAI currently supports the following static analysis components:
 
-### PE Structure Analysis
-
+#### PE Structure Analysis
 * PE header analysis
 * Section table analysis
 * Import table analysis
@@ -38,8 +38,7 @@ BHPAI currently supports the following static analysis components:
 * Overlay detection and analysis
 * File size and section ratio analysis
 
-### Entropy and Statistical Analysis
-
+#### Entropy and Statistical Analysis
 * Code section entropy
 * Maximum section entropy
 * Mean section entropy
@@ -48,16 +47,14 @@ BHPAI currently supports the following static analysis components:
 * Code-to-file ratios
 * Entropy-based packing indicators
 
-### String Analysis
-
+#### String Analysis
 * ASCII and Unicode string extraction
 * Total string statistics
 * Interesting and suspicious string detection
 * Suspicious string ratios
 * Version information analysis
 
-### API and Code Analysis
-
+#### API and Code Analysis
 * Imported API statistics
 * API sequence extraction
 * API repeat-ratio analysis
@@ -66,18 +63,53 @@ BHPAI currently supports the following static analysis components:
 * Control-flow-related PE characteristics
 * CFG-related feature extraction
 
-### Automatic Unpacking
-
+#### Automatic Unpacking
 BHPAI supports automatic detection and unpacking of selected executable packers:
 
 * UPX
-
   * NRV2B
   * NRV2D
   * NRV2E
 * WWPack
 
 The unpacking stage is performed before feature extraction whenever a supported packer is detected.
+
+---
+
+### Dynamic Behavioral Sandbox
+
+BHPAI includes a full user-mode dynamic analysis sandbox designed for controlled execution of PE samples. The sandbox consists of two main components:
+
+1. **Launcher** – Creates the target process in a suspended state, injects the monitor DLL, resumes execution, waits for termination (or timeout), then performs post-execution analysis.
+2. **Monitor DLL** (stealth names: `sysnethelper.dll` / `sysnethelper32.dll`) – Injected into the target process and responsible for comprehensive API monitoring, virtualization, and event collection.
+
+#### Key Capabilities of the Sandbox
+
+* **API Hooking (MinHook)** covering:
+  * File operations (Win32 + Native NT: `CreateFile`, `NtCreateFile`, `WriteFile`, `DeleteFile`, `MoveFileEx`, attribute changes, directory enumeration…)
+  * Registry operations (Win32 + Native: `RegCreateKeyEx`, `NtCreateKey`, `NtSetValueKey`…)
+  * Process & injection (`CreateProcess`, `CreateRemoteThread`, `VirtualAllocEx`, `WriteProcessMemory`, `NtMapViewOfSection`, `NtQueueApcThread`…)
+  * Network (`connect`, `send`/`recv`, DNS queries, `getaddrinfo`…)
+  * COM (`CoCreateInstance`, `CoGetClassObject`)
+  * Named pipes and named objects (mutex, event, semaphore, section)
+  * GDI / UI (BitBlt family, MessageBox, SetWindowsHookEx, SystemParametersInfo, CreateWindowEx…)
+
+* **Filesystem Virtualization**
+  Overlay-based redirection with whiteout support for delete semantics. Writes and deletes are redirected to an isolated overlay directory while reads prefer the overlay and fall back to the host (with policy-controlled exceptions for system paths).
+
+* **Registry Virtualization**
+  Complete overlay of registry keys and values (both Win32 and Native NT APIs) using a directory-based virtual store under `Overlay\RegistryOverlay`.
+
+* **Network Policy**
+  Configurable fake DNS, traffic redirection, port blocking, and optional bandwidth throttling via `network_policy.json`.
+
+* **Anti-Detection Measures**
+  Virtualization of common sandbox-detection named objects, rate-limiting of desktop GDI operations (visual payload mitigation), MessageBox spam suppression, and blocking of global/low-level hooks.
+
+* **Event Pipeline**
+  Asynchronous event collection → JSONL logging → semantic normalization → multi-event correlation (Drop-and-Execute, Reflective DLL loading, Manual Mapping, PE Unpacking, persistence, self-deletion…) → rule-based behavior risk score (0–100) → detailed JSON report.
+
+The sandbox is designed to complement the static analysis pipeline by capturing runtime behaviors that cannot be observed through static inspection alone.
 
 ---
 
@@ -171,6 +203,7 @@ The analysis pipeline can provide:
 * Packing information
 * SHAP-based prediction explanations
 * Heuristic YARA rules
+* **Dynamic behavior risk score and correlated alerts** (from the sandbox)
 
 ---
 
@@ -178,16 +211,16 @@ The analysis pipeline can provide:
 
 ## Dataset Overview
 
-| Metric                    |                      Value |
-| ------------------------- | -------------------------: |
-| Total samples             |                  **8,370** |
-| Malware                   |                  **4,210** |
-| Benign                    |                  **4,160** |
-| Train/Test Split          |                  **80/20** |
-| Selected Feature Count    |                    **165** |
-| API n-grams scanned       | **348,092 unique n-grams** |
-| API n-gram vocabulary     |                  **1,000** |
-| Positive-gain API n-grams |                     **32** |
+| Metric                    | Value                     |
+| ------------------------- | ------------------------: |
+| Total samples             | **8,370**                 |
+| Malware                   | **4,210**                 |
+| Benign                    | **4,160**                 |
+| Train/Test Split          | **80/20**                 |
+| Selected Feature Count    | **165**                   |
+| API n-grams scanned       | **348,092 unique n-grams**|
+| API n-gram vocabulary     | **1,000**                 |
+| Positive-gain API n-grams | **32**                    |
 
 The dataset is designed to include both malicious samples and increasingly difficult benign samples.
 
@@ -206,14 +239,14 @@ This helps reduce false positives caused by legitimate software that superficial
 
 # Training Summary
 
-| Metric             |         Value |
-| ------------------ | ------------: |
-| Model              |  **LightGBM** |
-| Best Iteration     |      **1000** |
-| Train ROC-AUC      |   **1.00000** |
-| Validation ROC-AUC |   **0.99814** |
-| Early Stopping     | **50 rounds** |
-| Decision Threshold |      **0.50** |
+| Metric             | Value          |
+| ------------------ | -------------: |
+| Model              | **LightGBM**   |
+| Best Iteration     | **1000**       |
+| Train ROC-AUC      | **1.00000**    |
+| Validation ROC-AUC | **0.99814**    |
+| Early Stopping     | **50 rounds**  |
+| Decision Threshold | **0.50**       |
 
 The model achieved a very high validation ROC-AUC while maintaining strong classification performance on the held-out evaluation set.
 
@@ -221,21 +254,21 @@ The model achieved a very high validation ROC-AUC while maintaining strong class
 
 # Main Performance
 
-| Metric              |      Score |
-| ------------------- | ---------: |
-| Accuracy            | **98.63%** |
-| Precision           | **99.16%** |
-| Recall / TPR        | **98.10%** |
-| F1-score            | **98.63%** |
-| ROC-AUC             | **99.78%** |
-| PR-AUC              | **99.81%** |
-| MCC                 | **97.26%** |
-| Cohen's Kappa       | **97.25%** |
-| Balanced Accuracy   | **98.63%** |
-| G-Mean              | **98.63%** |
-| Specificity / TNR   | **99.16%** |
-| False Positive Rate |  **0.84%** |
-| False Negative Rate |  **1.90%** |
+| Metric                | Score      |
+| --------------------- | ---------: |
+| Accuracy              | **98.63%** |
+| Precision             | **99.16%** |
+| Recall / TPR          | **98.10%** |
+| F1-score              | **98.63%** |
+| ROC-AUC               | **99.78%** |
+| PR-AUC                | **99.81%** |
+| MCC                   | **97.26%** |
+| Cohen's Kappa         | **97.25%** |
+| Balanced Accuracy     | **98.63%** |
+| G-Mean                | **98.63%** |
+| Specificity / TNR     | **99.16%** |
+| False Positive Rate   | **0.84%**  |
+| False Negative Rate   | **1.90%**  |
 
 ---
 
@@ -243,11 +276,10 @@ The model achieved a very high validation ROC-AUC while maintaining strong class
 
 |                    | Predicted Benign | Predicted Malware |
 | ------------------ | ---------------: | ----------------: |
-| **Actual Benign**  |     **825 (TN)** |        **7 (FP)** |
-| **Actual Malware** |      **16 (FN)** |      **827 (TP)** |
+| **Actual Benign**  | **825 (TN)**     | **7 (FP)**        |
+| **Actual Malware** | **16 (FN)**      | **827 (TP)**      |
 
 ### Summary
-
 * **TP:** 827
 * **TN:** 825
 * **FP:** 7
@@ -282,12 +314,12 @@ The main patterns observed in false-positive analysis include:
 Example false positives include legitimate software such as:
 
 | File                               | Predicted Malware Probability | Main Contributing Features             |
-| ---------------------------------- | ----------------------------: | -------------------------------------- |
-| `xpicleanup.exe`                   |                    **96.37%** | Small imports, no overlay, no manifest |
-| `DOSBox0.74-3-win32-installer.exe` |                    **61.99%** | Extremely high code entropy            |
-| `isotoxin.exe`                     |                    **73.71%** | High maximum entropy, no overlay       |
-| `SecureAssessmentBrowser.exe`      |                    **81.57%** | No overlay, small import table         |
-| `AkelUpdater.exe`                  |                    **76.30%** | High code entropy, no manifest         |
+| ----------------------------------- | ----------------------------: | -------------------------------------- |
+| `xpicleanup.exe`                   | **96.37%**                    | Small imports, no overlay, no manifest |
+| `DOSBox0.74-3-win32-installer.exe` | **61.99%**                    | Extremely high code entropy            |
+| `isotoxin.exe`                     | **73.71%**                    | High maximum entropy, no overlay       |
+| `SecureAssessmentBrowser.exe`      | **81.57%**                    | No overlay, small import table         |
+| `AkelUpdater.exe`                  | **76.30%**                    | High code entropy, no manifest         |
 
 These cases demonstrate an important challenge in static malware detection:
 
@@ -297,25 +329,22 @@ BHPAI therefore uses iterative hard-negative analysis to identify these cases an
 
 ---
 
-
----
-
 # Feature Importance
 
 The most influential features in the current model include:
 
 | Rank | Feature                |
 | ---: | ---------------------- |
-|    1 | `max_section_entropy`  |
-|    2 | `code_section_entropy` |
-|    3 | `overlay_size_bytes`   |
-|    4 | `import_size`          |
-|    5 | `manifest_size_log`    |
-|    6 | `is_console`           |
-|    7 | `api_repeat_ratio`     |
-|    8 | `is_gui`               |
-|    9 | `total_strings`        |
-|   10 | `aslr_enabled`         |
+| 1    | `max_section_entropy`  |
+| 2    | `code_section_entropy` |
+| 3    | `overlay_size_bytes`   |
+| 4    | `import_size`          |
+| 5    | `manifest_size_log`    |
+| 6    | `is_console`           |
+| 7    | `api_repeat_ratio`     |
+| 8    | `is_gui`               |
+| 9    | `total_strings`        |
+| 10   | `aslr_enabled`         |
 
 Entropy-related features are particularly influential because packed, compressed, and obfuscated executables frequently exhibit high entropy.
 
@@ -356,18 +385,19 @@ and is especially useful when false positives and false negatives have different
 
 # Current Limitations
 
-BHPAI is a static analysis framework and therefore has inherent limitations.
+BHPAI is primarily a static analysis framework augmented with a user-mode dynamic sandbox, and therefore has inherent limitations.
 
 It may be affected by:
 
-* Advanced packing
-* Custom executable protectors
+* Advanced packing / custom protectors
 * Runtime decryption
 * Fileless malware
 * Dynamic API resolution
 * Heavy obfuscation
 * Polymorphic and metamorphic malware
-* Samples requiring runtime behavior for detection
+* Samples that require prolonged runtime interaction
+* Direct syscalls that bypass user-mode hooks
+* Kernel-mode rootkits
 
 Static features can also produce false positives for legitimate software that is:
 
@@ -380,7 +410,7 @@ Static features can also produce false positives for legitimate software that is
 For this reason, BHPAI should complement, rather than replace:
 
 * Traditional antivirus engines
-* Sandbox analysis
+* Full-system / hypervisor-based sandboxes
 * Dynamic behavioral analysis
 * Reverse engineering
 * Threat intelligence
@@ -399,19 +429,28 @@ BHPAI is intended for:
 * Offline malware triage
 * Machine learning research in cybersecurity
 * Explainable malware detection research
+* Controlled dynamic behavioral analysis
 
 ---
 
 # Usage
 
+### Static Analysis
 ```bash
 python bhpai.py <filepath.exe>
 ```
-
 Example:
-
 ```bash
 python bhpai.py suspicious.exe
+```
+
+### Dynamic Sandbox
+```bash
+BHPAISandbox.exe <path_to_pe>
+```
+Example:
+```bash
+BHPAISandbox.exe sample.exe
 ```
 
 ---
@@ -429,5 +468,7 @@ BHPAI is a research-oriented malware analysis framework.
 The model is trained on a specific dataset and its performance may vary significantly on samples from different distributions, malware families, compiler toolchains, packers, and software ecosystems.
 
 Benchmark results should not be interpreted as a guarantee of real-world detection performance.
+
+The dynamic sandbox is a user-mode isolation environment and does not provide the same level of isolation as hypervisor-based or kernel-assisted sandboxes.
 
 BHPAI should be used as an additional analysis and research tool alongside established security solutions and professional malware analysis techniques.
