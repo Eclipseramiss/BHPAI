@@ -16,7 +16,6 @@ Unlike traditional signature-based antivirus engines, BHPAI does not primarily r
 - [AI-Powered Detection](#ai-powered-detection)
 - [Dataset & Training Results](#dataset--training-results)
 - [Usage](#usage)
-- [Building from Source](#building-from-source)
 - [Limitations](#limitations)
 - [Disclaimer](#disclaimer)
 
@@ -234,25 +233,6 @@ The GUI provides:
 
 ---
 
-## Building from Source
-
-### Requirements
-- Windows 10 / 11 (x64)
-- Visual Studio 2019 or later (C++17)
-- Python 3.9+
-- Capstone, MinHook, nlohmann/json, OpenSSL
-- PyQt6 or PySide6, LightGBM, scikit-learn, pandas, numpy, joblib
-
-### Build Steps (high-level)
-1. Build the static analyser (`pe_analyzer.exe`) and unpackers.
-2. Build the sandbox launcher (`BHPAISandbox.exe`) and monitor DLLs (`sysnethelper.dll` / `sysnethelper32.dll`).
-3. Place the trained model (`malware_detector_lgb.pkl`) and feature list (`selected_features.txt`) in the expected resource paths.
-4. Run the GUI or CLI tools.
-
-Detailed build instructions and CMake / MSBuild project files are provided in the respective source directories.
-
----
-
 
 ## Limitations
 
@@ -288,5 +268,5 @@ Use responsibly and only on samples you are authorised to analyse.
 
 ---
 
-**BHPAI — Behavioural Heuristic PE AI**
+**BHPAI**
 Research tool for malware analysis, reverse engineering and security education.
