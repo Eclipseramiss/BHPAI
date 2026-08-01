@@ -109,7 +109,7 @@ except ImportError:
     QT_API = "PySide6"
 
 
-APP_VERSION = "V1.0 Exclusive"
+APP_VERSION = "V1.1 Exclusive"
 APP_NAME = "BHPAI Security Suite"
 
 BG_MAIN       = "#f8fafc"   # Clean Light Slate Window background
@@ -140,9 +140,7 @@ SIDEBAR_W = 270
 IMAGE_DIR = Path(__file__).parent / "image"
 LOGO_PATH = IMAGE_DIR / "BHPA.png"
 
-
 def load_logo_scaled(width: int) -> QPixmap | None:
-    """Load BHPA.png logo preserving 3:2 ratio smoothly."""
     if LOGO_PATH.exists():
         pm = QPixmap(str(LOGO_PATH))
         if not pm.isNull():
@@ -745,7 +743,7 @@ class DashboardPage(QWidget):
 
         layout.addWidget(PageHeader(
             "Security Operations Center (SOC)",
-            "Trung tâm giám sát tổng quan hệ thống nhận diện & phân tích mã độc BHPAI V1",
+            "Trung tâm giám sát tổng quan hệ thống nhận diện & phân tích mã độc BHPAI V1.1",
         ))
 
         # Hero Banner Card with 170px width logo (~113px height)
@@ -905,8 +903,8 @@ class ScanPage(QWidget):
         layout.setSpacing(16)
 
         layout.addWidget(PageHeader(
-            "Phân tích PE & Quét AI Engine (V1)",
-            "Lựa chọn Chế độ Phân tích AI và chọn tệp thực thi Windows (.exe) để kiểm tra",
+            "PE Analysis & AI Scan Engine (V1.1)",
+            "Select an AI analysis mode and choose a Windows executable (.exe) to inspect.",
         ))
 
         # Mode Selector Card
@@ -915,7 +913,7 @@ class ScanPage(QWidget):
         m_layout.setContentsMargins(18, 16, 18, 16)
         m_layout.setSpacing(10)
 
-        m_title = QLabel("Cấu hình Chế độ Phân tích AI (BHPAI V1):")
+        m_title = QLabel("AI Analysis Mode Configuration (BHPAI V1.1):")
         m_title.setFont(get_font("Segoe UI", 10.5, bold=True))
         m_title.setStyleSheet(f"color: {FG_PRIMARY};")
         m_layout.addWidget(m_title)
@@ -1482,7 +1480,7 @@ class SandboxPage(QWidget):
         layout.addWidget(self.events_table)
 
         # ── Console Terminal Log ──────────────────────────────────────────────
-        log_header = QLabel("Môi trường Nhật ký BHPAISandbox Runtime")
+        log_header = QLabel("BHPAISandbox Runtime Log Environment")
         log_header.setFont(get_font("Segoe UI", 10.5, bold=True))
         log_header.setStyleSheet(f"color: {FG_PRIMARY};")
         layout.addWidget(log_header)
@@ -1490,11 +1488,11 @@ class SandboxPage(QWidget):
         self.sandbox_terminal = QTextEdit()
         self.sandbox_terminal.setObjectName("terminalLog")
         self.sandbox_terminal.setReadOnly(True)
-        self.sandbox_terminal.setPlaceholderText("Nhật ký sự kiện thời gian thực từ BHPAISandbox.exe...")
+        self.sandbox_terminal.setPlaceholderText("Real-time event log from BHPAISandbox.exe...")
         layout.addWidget(self.sandbox_terminal, stretch=1)
 
     def _browse_pe(self) -> None:
-        p, _ = QFileDialog.getOpenFileName(self, "Chọn tệp thực thi", "", "Executable Files (*.exe)")
+        p, _ = QFileDialog.getOpenFileName(self, "Select executable file", "", "Executable Files (*.exe)")
         if p:
             self.txt_sandbox_path.setText(p)
 
@@ -1509,7 +1507,7 @@ class SandboxPage(QWidget):
             return
 
         # Reset UI
-        self.stat_status.val_lbl.setText("Đang chạy...")
+        self.stat_status.val_lbl.setText("Running...")
         self.stat_pid.val_lbl.setText("---")
         self.stat_risk.val_lbl.setText("---")
         self.stat_confidence.val_lbl.setText("---")
@@ -1660,7 +1658,7 @@ class SandboxPage(QWidget):
             for alert in alerts_list:
                 self._log(f"    ⚠ {alert}", "danger")
         else:
-            self._log("✔ Không có behavioral alerts.", "success")
+            self._log("✔ No behavioral alerts detected.", "success")
 
         # ── Specific flag warnings ────────────────────────────────────────────
         if reg_persist:
@@ -1728,7 +1726,7 @@ class BenchmarkPage(QWidget):
         layout.setSpacing(16)
 
         layout.addWidget(PageHeader(
-            "Dataset Benchmark & AI Evaluation (V1)",
+            "Dataset Benchmark & AI Evaluation (V1.1)",
             "Đánh giá hiệu năng mô hình LightGBM AI trên tập mẫu malware và benign chuẩn hóa",
         ))
 
@@ -1746,7 +1744,7 @@ class BenchmarkPage(QWidget):
         ctrl_card = Card()
         c_l = QHBoxLayout(ctrl_card)
         c_l.setContentsMargins(20, 14, 20, 14)
-        c_l.addWidget(QLabel("Tập dữ liệu thử nghiệm: PE Malware Benchmark Dataset 2026 (5,000 samples) (test version not be real)"))
+        c_l.addWidget(QLabel("Demo dataset: PE Malware Benchmark Dataset 2026 (5,000 samples) — synthetic data only, not real."))
         c_l.addStretch()
 
         btn_run = QPushButton("Chạy Benchmark AI")
@@ -1760,7 +1758,7 @@ class BenchmarkPage(QWidget):
         self.bm_terminal = QTextEdit()
         self.bm_terminal.setObjectName("terminalLog")
         self.bm_terminal.setReadOnly(True)
-        self.bm_terminal.setPlaceholderText("Bấm 'Chạy Benchmark AI' để tiến hành kiểm thử Confusion Matrix...")
+        self.bm_terminal.setPlaceholderText("Click 'Run AI Benchmark' to perform a simulated confusion matrix evaluation...")
         layout.addWidget(self.bm_terminal, stretch=1)
 
     def _execute_benchmark(self) -> None:
@@ -1776,7 +1774,7 @@ class BenchmarkPage(QWidget):
         self.bm_terminal.append("<span style='color: #34d399;'>  • True Positives (TP): 2,452 | False Positives (FP): 80</span>")
         self.bm_terminal.append("<span style='color: #fde047;'>  • True Negatives (TN): 2,418 | False Negatives (FN): 50</span>")
         self.bm_terminal.append(f"<span style='color: #34d399; font-weight: bold;'>  • Overall AI Accuracy: {metrics['accuracy']}% | ROC-AUC Area: {metrics['roc_auc']}</span>")
-        self.bm_terminal.append("<span style='color: #38bdf8;'>  • Đánh giá hoàn tất thành công!</span>")
+        self.bm_terminal.append("<span style='color: #38bdf8;'>  • Benchmark simulation completed successfully!</span>")
 
 class AboutPage(QWidget):
     def __init__(self, parent: QWidget | None = None):
@@ -1810,8 +1808,8 @@ class AboutPage(QWidget):
         text_box.addWidget(ver_lbl)
 
         desc = QLabel(
-            "BHPAI V1 là giải pháp an ninh mạng chuyên sâu nhận diện mã độc trên hệ điều hành Windows. "
-            "Kết hợp trích xuất thuộc tính PE Tĩnh, mô hình học máy LightGBM và BHPAISandbox.exe giả lập rủi ro runtime."
+            "BHPAI V1.1 is an advanced Windows security platform for detecting malicious PE behavior. "
+            "It combines static PE metadata extraction, LightGBM machine learning, and a runtime sandbox simulation via BHPAISandbox.exe."
         )
         desc.setFont(get_font("Segoe UI", 10))
         desc.setStyleSheet(f"color: {FG_SECONDARY};")
@@ -1827,15 +1825,17 @@ class AboutPage(QWidget):
         a_l.setContentsMargins(24, 20, 24, 20)
         a_l.setSpacing(12)
 
-        a_title = QLabel("System Architecture Specifications (V1 Exclusive)")
+        a_title = QLabel("System Architecture Specifications (V1.1 Exclusive)")
         a_title.setFont(get_font("Segoe UI", 12, bold=True))
         a_title.setStyleSheet(f"color: {FG_PRIMARY};")
         a_l.addWidget(a_title)
 
         features_info = [
-            "1. Mode 1 (Only Static): Trích xuất PE Headers, Shannon Entropy, Section API n-grams & LightGBM .pkl prediction.",
-            "2. Mode 2 (Static + Dynamic): Kết hợp trích xuất siêu dữ liệu và kích hoạt container BHPAISandbox.exe.",
-            "3. System Telemetry: Giám sát tài nguyên phần cứng CPU utilization, RAM usage, tiến trình thời gian thực.",
+            "1. Mode 1 (Only Static): Extracts PE headers, Shannon entropy, section API n-grams, and LightGBM .pkl prediction.",
+            "2. Mode 2 (Static + Dynamic): Combines metadata extraction with runtime sandbox monitoring via BHPAISandbox.exe.",
+            "3. System Telemetry: Monitors hardware resources such as CPU utilization, RAM usage, and active processes.",
+            "4. Benchmark Simulation: Uses synthetic benchmark data only to demonstrate AI evaluation behavior.",
+            "5. Real-time Reporting: Displays sandbox events, risk scores, and behavioral alerts in the UI.",
         ]
 
         for item in features_info:
@@ -1901,7 +1901,7 @@ class BHPAIApp(QMainWindow):
         brand_title.setStyleSheet(f"color: {FG_PRIMARY}; letter-spacing: 0.5px;")
         brand_text_box.addWidget(brand_title)
 
-        brand_ver = QLabel("V1 EXCLUSIVE")
+        brand_ver = QLabel("V1.1 EXCLUSIVE")
         brand_ver.setFont(get_font("Segoe UI", 8, bold=True))
         brand_ver.setStyleSheet(f"color: {ACCENT_BLUE};")
         brand_text_box.addWidget(brand_ver)
@@ -1918,11 +1918,11 @@ class BHPAIApp(QMainWindow):
         sb_layout.addWidget(brand_card)
 
         nav_items_spec = [
-            ("Dashboard", "Tổng quan hệ thống SOC"),
-            ("Scan", "Phân tích PE & Quét AI"),
-            ("Sandbox", "Giả lập hành vi Runtime"),
-            ("Benchmark", "Đánh giá Dataset AI"),
-            ("About", "Thông tin phiên bản V1"),
+            ("Dashboard", "SOC Overview"),
+            ("Scan", "PE Analysis & AI Scan"),
+            ("Sandbox", "Runtime Behavior Emulation"),
+            ("Benchmark", "AI Benchmark Simulation"),
+            ("About", "Version Info"),
         ]
 
         sb_layout.addSpacing(10)
@@ -1939,7 +1939,7 @@ class BHPAIApp(QMainWindow):
         sb_footer.setContentsMargins(20, 16, 20, 20)
         sb_footer.setSpacing(4)
 
-        sf_title = QLabel("BHPAI AI Engine V1")
+        sf_title = QLabel("BHPAI AI Engine V1.1")
         sf_title.setFont(get_font("Segoe UI", 9, bold=True))
         sf_title.setStyleSheet(f"color: {FG_MUTED};")
         sb_footer.addWidget(sf_title)
