@@ -615,19 +615,19 @@ class DropZoneFrame(QFrame):
             self.logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(self.logo_lbl)
 
-        self.main_lbl = QLabel("KÉO & THẢ TỆP PE (.EXE) VÀO ĐÂY")
+        self.main_lbl = QLabel("DRAG & DROP PE FILES (.EXE) HERE")
         self.main_lbl.setFont(get_font("Segoe UI", 12, bold=True))
         self.main_lbl.setStyleSheet(f"color: {FG_PRIMARY}; letter-spacing: 0.5px;")
         self.main_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.main_lbl)
 
-        self.sub_lbl = QLabel("hoặc nhấp đúp vào vùng này để chọn tệp từ máy tính")
+        self.sub_lbl = QLabel("or double-click this area to select a file from your computer")
         self.sub_lbl.setFont(get_font("Segoe UI", 9.5))
         self.sub_lbl.setStyleSheet(f"color: {FG_MUTED}; font-weight: 600;")
         self.sub_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.sub_lbl)
 
-        btn_browse = QPushButton("Chọn Tệp Từ Máy Tính")
+        btn_browse = QPushButton("Browse Local File")
         btn_browse.setObjectName("btnSecondary")
         btn_browse.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         btn_browse.clicked.connect(self._browse_file)
@@ -661,7 +661,7 @@ class DropZoneFrame(QFrame):
     def _browse_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Chọn tệp PE thực thi để kiểm tra",
+            "Select PE executable to inspect",
             "",
             "Executable Files (*.exe);;All Files (*)",
         )
@@ -669,7 +669,7 @@ class DropZoneFrame(QFrame):
             self.set_file_path(path)
 
     def set_file_path(self, path: str) -> None:
-        self.main_lbl.setText(f"📁 ĐÃ CHỌN TỆP: {os.path.basename(path)}")
+        self.main_lbl.setText(f"📁 SELECTED FILE: {os.path.basename(path)}")
         self.main_lbl.setStyleSheet(f"color: {EMERALD_GREEN}; font-weight: bold;")
         self.sub_lbl.setText(path)
         if self._on_path_selected:
@@ -767,7 +767,7 @@ class DashboardPage(QWidget):
         hero_text_layout.addWidget(hero_title)
 
         hero_desc = QLabel(
-            "Hệ thống tự động trích xuất siêu dữ liệu PE Tĩnh kết hợp mô hình học máy LightGBM "
+            "The system automatically extracts static PE metadata combined with a LightGBM machine learning model "
             "và môi trường Sandbox BHPAISandbox.exe để bảo vệ toàn diện hệ thống Windows."
         )
         hero_desc.setFont(get_font("Segoe UI", 9.5))
@@ -930,13 +930,13 @@ class ScanPage(QWidget):
         self.mode1_frame.setProperty("active", "true")
         self.mode1_frame.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         m1_l = QVBoxLayout(self.mode1_frame)
-        self.radio_mode1 = QRadioButton("Chế độ 1: Only Static (Phân Tích Tĩnh AI)")
+        self.radio_mode1 = QRadioButton("Mode 1: Only Static (Static AI Analysis)")
         self.radio_mode1.setChecked(True)
         self.mode_group.addButton(self.radio_mode1, 1)
         self.radio_mode1.toggled.connect(self._on_mode_toggled)
         m1_l.addWidget(self.radio_mode1)
 
-        m1_desc = QLabel("Tối ưu tốc độ. Kiểm tra cấu trúc PE, Entropy, API n-grams và dự đoán qua LightGBM .pkl.")
+        m1_desc = QLabel("Optimized for speed. Inspects PE structure, entropy, API n-grams, and predicts via LightGBM .pkl.")
         m1_desc.setFont(get_font("Segoe UI", 9))
         m1_desc.setStyleSheet(f"color: {FG_MUTED};")
         m1_desc.setWordWrap(True)
@@ -948,12 +948,12 @@ class ScanPage(QWidget):
         self.mode2_frame.setProperty("active", "false")
         self.mode2_frame.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         m2_l = QVBoxLayout(self.mode2_frame)
-        self.radio_mode2 = QRadioButton("Chế độ 2: Static + Dynamic (Kết hợp Tĩnh & Động)")
+        self.radio_mode2 = QRadioButton("Mode 2: Static + Dynamic (Combined Static & Dynamic)")
         self.mode_group.addButton(self.radio_mode2, 2)
         self.radio_mode2.toggled.connect(self._on_mode_toggled)
         m2_l.addWidget(self.radio_mode2)
 
-        m2_desc = QLabel("Toàn diện nhất. Phân tích tĩnh kết hợp kích hoạt BHPAISandbox.exe để đo lường nguy cơ Runtime.")
+        m2_desc = QLabel("Most comprehensive. Static analysis combined with BHPAISandbox.exe runtime risk measurement.")
         m2_desc.setFont(get_font("Segoe UI", 9))
         m2_desc.setStyleSheet(f"color: {FG_MUTED};")
         m2_desc.setWordWrap(True)
@@ -981,11 +981,11 @@ class ScanPage(QWidget):
         self.spin_thresh.setValue(0.49)
         c_layout.addWidget(self.spin_thresh)
 
-        self.lbl_selected_file = QLabel("Chưa chọn tệp PE.")
+        self.lbl_selected_file = QLabel("No PE file selected.")
         self.lbl_selected_file.setStyleSheet(f"color: {FG_MUTED}; font-style: italic;")
         c_layout.addWidget(self.lbl_selected_file, stretch=1)
 
-        self.btn_run_scan = QPushButton("BẮT ĐẦU QUÉT AI")
+        self.btn_run_scan = QPushButton("START AI SCAN")
         self.btn_run_scan.setObjectName("btnSecondary")
         self.btn_run_scan.setEnabled(False)
         self.btn_run_scan.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -1012,7 +1012,7 @@ class ScanPage(QWidget):
         g_title_row.addWidget(g_title)
         g_title_row.addStretch()
 
-        self.lbl_auto_badge = StatusPill("SẴN SÀNG", "#f1f5f9", FG_MUTED)
+        self.lbl_auto_badge = StatusPill("READY", "#f1f5f9", FG_MUTED)
         g_title_row.addWidget(self.lbl_auto_badge)
         g_layout.addLayout(g_title_row)
 
@@ -1067,7 +1067,7 @@ class ScanPage(QWidget):
         ex_title.setStyleSheet(f"color: {FG_PRIMARY};")
         ex_layout.addWidget(ex_title)
 
-        lbl_shap_head = QLabel("Lý do Static AI nghi ngờ (SHAP):")
+        lbl_shap_head = QLabel("Static AI Suspicion Reasons (SHAP):")
         lbl_shap_head.setFont(get_font("Segoe UI", 8.5, bold=True))
         lbl_shap_head.setStyleSheet(f"color: {CYAN_ACCENT}; text-transform: uppercase;")
         ex_layout.addWidget(lbl_shap_head)
@@ -1078,7 +1078,7 @@ class ScanPage(QWidget):
         self.txt_shap_reasons.setStyleSheet(
             f"background-color: {BG_MAIN}; border: 1px solid {BORDER_LIGHT}; border-radius: 6px; font-size: 8.5pt; font-family: 'Segoe UI';"
         )
-        self.txt_shap_reasons.setPlaceholderText("Chưa có kết quả phân tích SHAP...")
+        self.txt_shap_reasons.setPlaceholderText("No SHAP analysis results available yet...")
         ex_layout.addWidget(self.txt_shap_reasons)
 
         lbl_ver_head = QLabel("Sandbox Verification (SHAP Cross-Ref):")
@@ -1110,7 +1110,7 @@ class ScanPage(QWidget):
         ex_layout.addWidget(self.txt_matched_rules)
 
         # ── Sandbox navigate button (hidden until Mode 2 scan completes) ──────
-        self.btn_open_sandbox = QPushButton("🔬 Mở Sandbox Detail Tab")
+        self.btn_open_sandbox = QPushButton("🔬 Open Sandbox Detail Tab")
         self.btn_open_sandbox.setObjectName("btnSecondary")
         self.btn_open_sandbox.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_open_sandbox.setVisible(False)
@@ -1195,7 +1195,7 @@ class ScanPage(QWidget):
         self.log_terminal = QTextEdit()
         self.log_terminal.setObjectName("terminalLog")
         self.log_terminal.setReadOnly(True)
-        self.log_terminal.setPlaceholderText("Sẵn sàng. Chọn tệp PE và bấm BẮT ĐẦU QUÉT AI...")
+        self.log_terminal.setPlaceholderText("Ready. Select a PE file and click START AI SCAN...")
         layout.addWidget(self.log_terminal, stretch=1)
 
     def _on_mode_toggled(self) -> None:
